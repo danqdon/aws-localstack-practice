@@ -50,26 +50,31 @@ LocalStack can be easily set up on a local development machine using Docker, whi
 
   ## Configuration and Deployment
 
-1. **Run LocalStack**: To start LocalStack, use the following Docker command:
+1. **Run LocalStack**:
+   To start LocalStack, use the following Docker command:
     ```bash
     docker run -d -p 4566:4566 -p 4571:4571 localstack/localstack
     ```
     This command runs LocalStack in a Docker container and exposes the default ports. Port `4566` is the main entry point for all service requests. Port `4571` is used for the legacy S3 service.
 
-2. **Environment Configuration**: Optionally, you can set environment variables to configure LocalStack. For example, setting `SERVICES=s3,lambda,dynamodb,apigateway` will launch only these specified services. To do this, add `-e` followed by the environment variable in the Docker run command:
+3. **Environment Configuration**:
+   Optionally, you can set environment variables to configure LocalStack. For example, setting `SERVICES=s3,lambda,dynamodb,apigateway` will launch only these specified services. To do this, add `-e` followed by the environment variable in the Docker run command:
     ```bash
     docker run -d -e SERVICES=s3,lambda,dynamodb,apigateway -p 4566:4566 -p 4571:4571 localstack/localstack
     ```
 
-3. **Verify Installation**: To verify that LocalStack is running correctly, you can use the following command:
+5. **Verify Installation**:
+   To verify that LocalStack is running correctly, you can use the following command:
     ```bash
     docker logs [container_id]
     ```
     Replace `[container_id]` with the ID of your LocalStack Docker container. This command displays the logs of the LocalStack container and should show the services starting up.
 
-4. **Access LocalStack Services**: Once LocalStack is running, you can access the services using the AWS CLI or SDKs. Remember to configure these tools to point to your local endpoint (typically `http://localhost:4566`) instead of the real AWS endpoints.
+7. **Access LocalStack Services**:
+   Once LocalStack is running, you can access the services using the AWS CLI or SDKs. Remember to configure these tools to point to your local endpoint (typically `http://localhost:4566`) instead of the real AWS endpoints.
 
-5. **Stopping LocalStack**: To stop LocalStack, use the Docker stop command followed by your container ID:
+9. **Stopping LocalStack**:
+    To stop LocalStack, use the Docker stop command followed by your container ID:
     ```bash
     docker stop [container_id]
     ```
@@ -83,25 +88,123 @@ This setup provides a convenient and efficient way to mimic AWS cloud services l
 To initiate the project setup and configure AWS services using LocalStack, follow these steps:
 
 1. **Stop and Start LocalStack**:
+   
    Ensure LocalStack is not already running. If it is, stop and restart it to ensure a clean state.
    ```bash
    docker stop milocalstack
    docker start milocalstack
    ```
 2. **Navigate to the Project Directory**:
+   
    Change the directory to the location of your AWS setup script.
    ```bash
    cd $args[0]
    ```
 3. **Create S3 Buckets:**
+   
    Execute the commands to create S3 buckets for storing artifacts, data lake files, and lambda logs.
    ```bash
    aws s3 mb s3://gitradar-datalake --endpoint-url=http://localhost:4566
    aws s3 mb s3://gitradar-artifacts --endpoint-url=http://localhost:4566
    aws s3 mb s3://gitradar-lambda-logs --endpoint-url=http://localhost:4566
    ```
+   
+4. **Upload Artifacts to S3**
+   
+   Upload necessary artifacts to the gitradar-artifacts bucket.
+   ```bash
+   aws s3 cp .\artifacts s3://gitradar-artifacts --recursive --endpoint-url=http://localhost:4566
+   ```
+5. **Create DynamoDB Tables:**
+    
+   Set up DynamoDB tables for storing tokenized suggestion data and metrics.
+   ```bash
+   aws dynamodb create-table `
+    --table-name FilesTokens `
+    --attribute-definitions AttributeName=FileName,AttributeType=S `
+    --key-schema AttributeName=FileName,KeyType=HASH `
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 `
+    --endpoint-url http://localhost:4566
 
+   aws dynamodb create-table `
+    --table-name FilesMetrics `
+    --attribute-definitions AttributeName=FileName,AttributeType=S `
+    --key-schema AttributeName=FileName,KeyType=HASH `
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 `
+    --endpoint-url http://localhost:4566
+   ```
+6. **Deploy Lambda Functions:**
+   
+   Deploy Lambda functions for metrics analysis and tokenization. These functions are defined in packages stored in the `gitradar-artifacts` S3 bucket.
+   - For creating the gitradar-code-metrics Lambda function:
+   ```bash
+   aws --endpoint-url=http://localhost:4566 lambda create-function \
+    --function-name gitradar-code-metrics \
+    --runtime python3.8 \
+    --handler gitradar-code-metrics.lambda_handler \
+    --code S3Bucket=gitradar-artifacts,S3Key=lambda_metrics_package.zip \
+    --role arn:aws:iam::000000000000:role/lambda-role
+   ```
+   - Add permissions and update configuration for 'gitradar-code-metrics'
+   ```bash
+   aws --endpoint-url=http://localhost:4566 lambda add-permission \
+    --function-name gitradar-code-metrics \
+    --statement-id s3invoke \
+    --action "lambda:InvokeFunction" \
+    --principal s3.amazonaws.com \
+    --source-arn arn:aws:s3:::gitradar-datalake
 
+    aws lambda update-function-configuration \
+     --function-name gitradar-code-metrics \
+     --timeout 200 \
+     --memory-size 2048 \
+     --endpoint-url=http://localhost:4566
+
+   ```
+   - For creating the gitradar-code-tokenizer Lambda function:
+   ```bash
+   aws --endpoint-url=http://localhost:4566 lambda create-function `
+    --function-name gitradar-code-tokenizer `
+    --runtime python3.8 `
+    --handler gitradar-code-tokenizer.lambda_handler `
+    --code S3Bucket=gitradar-artifacts,S3Key=lambda_tokenizer_package.zip `
+    --role arn:aws:iam::000000000000:role/lambda-role
+   ```
+   - Add permissions and update configuration for 'gitradar-code-tokenizer'
+   ```bash
+   aws --endpoint-url=http://localhost:4566 lambda add-permission --function-name gitradar-code-tokenizer --statement-id s3invoke --action "lambda:InvokeFunction" principal s3.amazonaws.com --source-arn arn:aws:s3:::gitradar-datalake
+   ```
+8. **Set Up API Gateway:**
+   
+   Create and configure a REST API using API Gateway to interact with the deployed Lambda functions.
+   ```bash
+   # Command to create a new REST API and define resources, methods, and integrations
+   ```
+   Deploy the API to make it accessible:
+   ```bash
+   # Command to deploy the API and generate accessible endpoints
+   ```
+   The API endpoints will be echoed for easy access:
+   ```bash
+   echo "API Endpoints:"
+   echo "Metrics API: http://localhost:4566/restapis/$apiID/test/_user_request_/metrics"
+   echo "Suggestions API: http://localhost:4566/restapis/$apiID/test/_user_request_/suggestions"
+   ```
+9. **Upload Data to S3 Bucket:**
+
+   Upload files to the gitradar-datalake bucket. This triggers the Lambda functions as per the bucket notification configuration.
+   ```bash
+   $sourceDir = ".\gitradar-datalake\"
+   $s3Bucket = "s3://gitradar-datalake"
+   $endpointUrl = "http://localhost:4566"
+
+   foreach ($file in Get-ChildItem -Path $sourceDir) {
+    aws s3 cp "$sourceDir$file" "$s3Bucket" --endpoint-url="$endpointUrl"
+    Start-Sleep -Seconds 2
+   }
+
+   ```
+   
 ### Clone the Repository
 ```bash
 git clone [repository URL]
