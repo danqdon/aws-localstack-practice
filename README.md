@@ -34,7 +34,7 @@ The project utilizes the following AWS services, simulated through LocalStack:
 
 The following diagram illustrates the architecture of the LocalStack AWS project:
 
-![Architecture Diagram](path_to_image.png)
+![Architecture Diagram](aws_architecture.png)
 
 ### Components:
 
