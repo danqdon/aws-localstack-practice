@@ -6,12 +6,7 @@
 3. [Prerequisites](#prerequisites)
 4. [Configuration and Deployment](#configuration-and-deployment)
 5. [Usage and Examples](#usage-and-examples)
-6. [Scalability and Architecture](#scalability-and-architecture)
-7. [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
-8. [Contribution and Support](#contribution-and-support)
-9. [License](#license)
-10. [References](#references)
-
+   
 ## Introduction
 
 This project is designed to bridge the gap between theoretical knowledge and practical application in cloud services. It provides a sandbox environment where both beginners and experienced cloud practitioners can learn, experiment, and develop without the costs and risks associated with an actual AWS cloud environment.
@@ -117,7 +112,7 @@ To initiate the project setup and configure AWS services using LocalStack, follo
    ```
 5. **Create DynamoDB Tables:**
     
-   Set up DynamoDB tables for storing tokenized suggestion data and metrics.
+   DynamoDB tables are set up for storing tokenized suggestion data and metrics. DynamoDB was chosen for its scalability and performance as a NoSQL database, making it well-suited for potential horizontal scaling and handling large volumes of data efficiently.
    ```bash
    aws dynamodb create-table `
     --table-name FilesTokens `
@@ -145,6 +140,7 @@ To initiate the project setup and configure AWS services using LocalStack, follo
     --code S3Bucket=gitradar-artifacts,S3Key=lambda_metrics_package.zip \
     --role arn:aws:iam::000000000000:role/lambda-role
    ```
+   This Lambda function is responsible for analyzing and processing data uploaded to the S3 bucket. It calculates various metrics based on the content of the files,       such as frequency of certain terms or patterns. This function is triggered whenever a new file is uploaded to the S3 bucket.
    - Add permissions and update configuration for 'gitradar-code-metrics'
    ```bash
    aws --endpoint-url=http://localhost:4566 lambda add-permission \
@@ -170,27 +166,92 @@ To initiate the project setup and configure AWS services using LocalStack, follo
     --code S3Bucket=gitradar-artifacts,S3Key=lambda_tokenizer_package.zip `
     --role arn:aws:iam::000000000000:role/lambda-role
    ```
+   This Lambda function is designed to generate new suggestions for potential tokens based on the text content of files uploaded to the S3 bucket. It analyzes the content to suggest new, relevant tokens that could be added to the database or used in further processing. Similar to the metrics function, it is automatically triggered by the upload of new files to the S3 bucket, ensuring a dynamic and responsive data processing workflow.
    - Add permissions and update configuration for 'gitradar-code-tokenizer'
    ```bash
    aws --endpoint-url=http://localhost:4566 lambda add-permission --function-name gitradar-code-tokenizer --statement-id s3invoke --action "lambda:InvokeFunction" principal s3.amazonaws.com --source-arn arn:aws:s3:::gitradar-datalake
    ```
+
+ 7. **Configure S3 Bucket Notifications:**
+The bucket notification configuration establishes automated triggers for the Lambda functions in response to new objects being added to the gitradar-datalake bucket. With this setup, whenever a file is uploaded to the bucket, the following actions are automatically initiated:
+-    The gitradar-code-metrics Lambda function is called into action to perform metrics analysis on the uploaded file. This analysis includes evaluating various metrics that provide insights into the file's content and characteristics.
+
+-    The gitradar-code-tokenizer Lambda function is triggered to generate new token suggestions based on the content of the uploaded file. It intelligently processes the text to suggest potential new tokens, enhancing the database and offering relevant content for further analysis.
+
+This configuration ensures an efficient, real-time data processing workflow. It allows the system to automatically and promptly respond to new file uploads, thereby eliminating the need for manual intervention and streamlining the overall data handling process.
+
+- Configure bucket notifications to trigger the Lambda functions when new objects are created in the gitradar-datalake bucket:
+  ```bash
+    aws --endpoint-url=http://localhost:4566 s3api put-bucket-notification-configuration \
+    --bucket gitradar-datalake \
+    --notification-configuration '{\"LambdaFunctionConfigurations\": [{\"Id\": \"lambda-function-1\", \"LambdaFunctionArn\": \"arn:aws:lambda:us east-1:000000000000:function:gitradar-code-metrics\", \"Events\": [\"s3:ObjectCreated:*\"]}, {\"Id\": \"lambda-function-2\", \"LambdaFunctionArn\": \"arn:aws:lambda:us-east-1:000000000000:function:gitradar-code-tokenizer\", \"Events\": [\"s3:ObjectCreated:*\"]}]}'
+  ```
+- Verify the bucket notification configuration:
+   ```bash
+   aws --endpoint-url=http://localhost:4566 s3api get-bucket-notification-configuration \
+    --bucket gitradar-datalake
+   ```
+   
 8. **Set Up API Gateway:**
    
-   Create and configure a REST API using API Gateway to interact with the deployed Lambda functions.
+   - Create and configure a REST API using API Gateway to interact with the deployed Lambda functions.
    ```bash
-   # Command to create a new REST API and define resources, methods, and integrations
+   $response = aws --endpoint-url=http://localhost:4566 apigateway create-rest-api --name "API try2"
+   $apiID = $response.Split('\"')[4]
    ```
-   Deploy the API to make it accessible:
-   ```bash
-   # Command to deploy the API and generate accessible endpoints
-   ```
-   The API endpoints will be echoed for easy access:
-   ```bash
-   echo "API Endpoints:"
-   echo "Metrics API: http://localhost:4566/restapis/$apiID/test/_user_request_/metrics"
-   echo "Suggestions API: http://localhost:4566/restapis/$apiID/test/_user_request_/suggestions"
-   ```
-9. **Upload Data to S3 Bucket:**
+   - Define the resources or endpoints within your API. Each resource represents a specific functionality or data point your API will offer.
+  - **Metrics Resource**:
+    Create a resource for metrics analysis. This endpoint will be used to access and manage metrics data processed by your Lambda functions.
+    ```bash
+    $response = aws --endpoint-url=http://localhost:4566 apigateway get-resources --rest-api-id $apiID
+    $parentID = $response.Split('\"')[8]
+    $response = aws --endpoint-url=http://localhost:4566 apigateway create-resource --rest-api-id $apiID --parent-id $parentID --path-part "{somethingId}"
+    $resourceID = $response.Split('\"')[4]
+    ```
+  - **Suggestions Resource**:
+    Similarly, set up a resource for the suggestions feature. This endpoint will handle requests related to generating and retrieving token suggestions.
+    ```bash
+    $response = aws --endpoint-url=http://localhost:4566 apigateway create-resource --rest-api-id $apiID --parent-id $parentID --path-part "suggestions"
+    $resourceID = $response.Split('\"')[4]
+    ```
+   - **Configure methods and integration:**
+  - For each resource, define the HTTP methods (like GET, POST) and link these methods to your Lambda functions through integrations.
+    - Metrics Integration:
+      Connect the metrics resource with the corresponding Lambda function to process and retrieve metrics data.
+    ```bash
+    aws --endpoint-url=http://localhost:4566 apigateway put-method --rest-api-id $apiID --resource-id $resourceID --http-method GET --request-parameters "method.request.path.somethingId=true" --authorization-type "NONE"
+    aws --endpoint-url=http://localhost:4566 apigateway put-integration --rest-api-id $apiID --resource-id $resourceID --http-method GET --type AWS_PROXY --integration-http-method POST --uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:apigw-lambda/invocations --passthrough-behavior WHEN_NO_MATCH
+    ```
+    - Suggestion Integration:
+    Set up the suggestions resource to interact with its Lambda function, enabling users to request and receive token suggestions.
+    ```bash
+    aws --endpoint-url=http://localhost:4566 apigateway put-method --rest-api-id $apiID --resource-id $resourceID --http-method GET --request-parameters "method.request.path.somethingId=true" --authorization-type "NONE"
+    aws --endpoint-url=http://localhost:4566 apigateway put-integration --rest-api-id $apiID --resource-id $resourceID --http-method GET --type AWS_PROXY --integration-http-method POST --uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:apigw-lambda2/invocations --passthrough-behavior WHEN_NO_MATCH
+    ```
+
+9. **Deploy de API:**
+   Make your API available to users by deploying it. This step activates the API and makes it accessible via the provided endpoints.
+    - Deploy metrics API:
+      Deploy the metrics component of your API to make it publicly accessible.
+      ```bash
+      aws --endpoint-url=http://localhost:4566 apigateway create-deployment --rest-api-id $apiID --stage-name metrics
+      ```
+
+    - Deploy suggestions API:
+      Similarly, deploy the suggestions component of your API.
+      ```bash
+      aws --endpoint-url=http://localhost:4566 apigateway create-deployment --rest-api-id $apiID --stage-name metrics
+      ```
+
+    - API endpoints:
+      Provide the URLs for the deployed API endpoints. Users can use these URLs to interact with your API.
+      ```bash
+      echo "http://localhost:4566/restapis/$apiID/test/_user_request_/metrics"
+      echo "http://localhost:4566/restapis/$apiID/test/_user_request_/suggestions"
+      ```
+
+
+11. **Upload Data to S3 Bucket:**
 
    Upload files to the gitradar-datalake bucket. This triggers the Lambda functions as per the bucket notification configuration.
    ```bash
@@ -207,4 +268,5 @@ To initiate the project setup and configure AWS services using LocalStack, follo
    
 ### Clone the Repository
 ```bash
-git clone [repository URL]
+git clone https://github.com/danqdon/aws-localstack-practice
+```
