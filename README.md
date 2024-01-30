@@ -3,9 +3,10 @@
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Technologies Used](#technologies-used)
-3. [Prerequisites](#prerequisites)
-4. [Configuration and Deployment](#configuration-and-deployment)
-5. [Usage and Examples](#usage-and-examples)
+3. [Architecture Overview](#architecture-overview)
+4. [Prerequisites](#prerequisites)
+5. [Configuration and Deployment](#configuration-and-deployment)
+6. [Usage and Examples](#usage-and-examples)
    
 ## Introduction
 
@@ -28,6 +29,31 @@ The project utilizes the following AWS services, simulated through LocalStack:
   - DynamoDB: A fast and flexible NoSQL database service. In this project, DynamoDB is employed for database management, reflecting its potential for future large-scale horizontal expansion. While the current implementation may not demonstrate handling massive datasets, the choice of DynamoDB is strategic, considering its scalability and performance in larger, more complex applications.
 
   - API Gateway: Manages and facilitates the creation, deployment, and maintenance of APIs. This project uses API Gateway to establish RESTful APIs. The inclusion of API Gateway is based on its scalability and ability to handle a high number of requests, making it a suitable choice for future expansion and more extensive application integration.
+
+## Architecture Overview
+
+The following diagram illustrates the architecture of the LocalStack AWS project:
+
+![Architecture Diagram](path_to_image.png)
+
+### Components:
+
+- **S3 Buckets**: Two S3 buckets are used; one for storing the artifacts (`gitradar-artifacts`) and another for the data lake (`gitradar-datalake`). They store files and trigger Lambda functions upon new object creation.
+
+- **Lambda Functions**: Two Lambda functions handle different aspects of the system:
+  - `gitradar-code-metrics`: Analyzes metrics from the files in the data lake.
+  - `gitradar-code-tokenizer`: Generates suggestions for new tokens based on the content of the uploaded files.
+
+- **DynamoDB**: Two DynamoDB tables are utilized for persistent storage:
+  - `FilesTokens`: Stores tokenized data from the `gitradar-code-tokenizer` function.
+  - `FilesMetrics`: Stores metrics data from the `gitradar-code-metrics` function.
+
+- **API Gateway**: Manages and exposes RESTful endpoints for external interactions with the Lambda functions. It has two main resources:
+  - `/metrics`: Endpoint for accessing the metrics analysis results.
+  - `/suggestions`: Endpoint for fetching token suggestions.
+
+The arrows indicate the flow of data and triggers between the components, showcasing a serverless architecture that's scalable and efficient for processing and storing data.
+
 
 ## Prerequisites
 
