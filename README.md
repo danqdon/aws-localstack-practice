@@ -10,7 +10,7 @@
    
 ## Introduction
 
-This project is designed to bridge the gap between theoretical knowledge and practical application in cloud services. It provides a sandbox environment where both beginners and experienced cloud practitioners can learn, experiment, and develop without the costs and risks associated with an actual AWS cloud environment.
+This project is designed to bridge the gap between theoretical knowledge and practical application in cloud services. It provides a sandbox environment to experiment and develop without the costs and risks associated with an actual AWS cloud environment.
 
 Using LocalStack, the project emulates essential AWS services such as S3, Lambda, DynamoDB, and API Gateway. These services are integral to many cloud-based applications, and mastering them is critical for modern cloud computing practices. The project's scalability and adaptability make it a perfect learning platform, offering transferable skills for real-world AWS environments. Additionally, it serves as a practical resource for educators in cloud computing, enhancing both learning and teaching experiences in this rapidly evolving field.
 
