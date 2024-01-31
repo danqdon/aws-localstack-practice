@@ -7,10 +7,6 @@ s3_client = boto3.client('s3', region_name="us-east-1")
 dynamodb = boto3.resource('dynamodb')
 table_name = 'FilesTokens'
 table = dynamodb.Table(table_name)
-desired_key_order = ['FileName', 'Number_of_imports', 'Lines_of_code', 'Lines_of_comments', 'Percentage_comment',
-                     'Number_of_variables', 'Number_of_types', 'Number_of_classes', 'Number_of_interfaces', 'Number_of_methods',
-                     'Number_of_enumerate', 'Number_of_abstract_types', 'Abstractness', 'Imported_libraries', 'Class_names',
-                     'Interface_names', 'Variable_names', 'Enumerate_names']
 
 def upload_log(event, context):
     log_data = {
