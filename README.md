@@ -38,14 +38,19 @@ The following diagram illustrates the architecture of the LocalStack AWS project
 
 ### Components:
 
-- **S3 Buckets**: Two S3 buckets are used; one for storing the artifacts (`gitradar-artifacts`) and another for the data lake (`gitradar-datalake`). They store files and trigger Lambda functions upon new object creation.
+- **S3 Buckets**: The architecture utilizes three S3 buckets:
+   - (`gitradar-artifacts`): stores Lambda function packages and other necessary artifacts.
+   - (`gitradar-datalake`): acts as a data lake to store and process uploaded files.
+   - (`gitradar-lambda-logs`): captures and stores logs from Lambda functions for event monitoring and debugging.
 
 - **Lambda Functions**: Two Lambda functions handle different aspects of the system:
   - `gitradar-code-metrics`: Analyzes metrics from the files in the data lake.
   - `gitradar-code-tokenizer`: Generates suggestions for new tokens based on the content of the uploaded files.
+  
+  Both Lambda functions log their event data to the gitradar-lambda-logs bucket, providing a record of each invocation.
 
 - **DynamoDB**: Two DynamoDB tables are utilized for persistent storage:
-  - `FilesTokens`: Stores tokenized data from the `gitradar-code-tokenizer` function.
+  - `FilesTokens`: Stores tokenized suggestion data from the `gitradar-code-tokenizer` function.
   - `FilesMetrics`: Stores metrics data from the `gitradar-code-metrics` function.
 
 - **API Gateway**: Manages and exposes RESTful endpoints for external interactions with the Lambda functions. It has two main resources:
